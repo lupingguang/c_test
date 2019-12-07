@@ -11,6 +11,9 @@ step 2
 step 3
 //build local branch
 git init
+git branch local_branch_name
+//set local branch "local_branch_name" refering  to remote default branch "master"
+git branch --set-upstream-to=origin/master local_branch_name
 
 step 4
 //connect to you github repository
