@@ -1,0 +1,7 @@
+gcc -o inotify_epoll inotify_epoll.c
+mkdir tmp
+./inotify_epoll tmp/ &
+mkfifo tmp/1 tmp/2 tmp/3
+echo aaa > tmp/1
+echo bbb > tmp/2
+rm tmp/3
