@@ -1,0 +1,45 @@
+1.list
+
+从内核中扣出list的实现，内核链表的特点：
+1. 环形双向
+2. list_head类型的node中只包含两个成员：指向上一个node的list_head类型指针与指向下一个node的指针
+3. 各个list_head类型的node的prev与next只会指向上一个node与下一个node，不指向实际数据，所以这个list通用型很强
+4. 一般使用时，先使用LIST_HEAD定义初始化一个list_head类型的头node，后面嵌入到实际数据中的node都会以此链接到头node之后
+
+注意：同一个node不要插入两次，因为第二次插入会把第一次已经链接到该node后面的node丢掉
+下面时测试的数据：
+list [0]= prev:0x6020a0, next:0x602098
+list [1]= prev:0x6020c8, next:0x6020c0
+list [2]= prev:0x6020f0, next:0x6020e8
+list [3]= prev:0x602118, next:0x602110
+list [4]= prev:0x602140, next:0x602138
+queue head. prev:0x602138, head.next:0x602098
+
+当再次插入list[1]节点到这个list时，list.next就会丢掉下一个node地址，所以链表就断了
+
+2.queue与stack
+
+利用list提供的list_add或者list_add_tail可以很简单实现队列与栈
+需要定义自己的queue_info,当然这不是被list管理的有用数据，只是用来记录queue状态的
+可以在自己的queue结构体中定义list_head指针存放list的头node，方便后面操作链表
+也可以定义一些锁或者信号量，用来同步queue的入队与出队
+
+3.event queue
+
+基于上面的queue或者stack，设计出了用来存放事件的队列或者栈
+1.使用时，一般会有一个处理event的线程，他需要构造初始化一个queue，然后阻塞在event_recv函数（信号量实现阻塞）
+2.其它线程可以任意时间调用event_send函数向第一步创建的queue发送事件，发送的事件并不会被立即处理，而只是放入queue便返回
+3.自定义一个event_info结构体，这个结构体才是被queue(进一步说应该是list)所管理的有用数据
+4.虽然在调用event_send时需要传入一个event_info,但这个仅仅时局部变量，在event_send函数实现中，会从heap申请空间，重新创建一个event_info1
+  拷贝传入event_info到堆对象中event_info1中，event_info1才是list管理的对象
+5.一般情况下，queue中的event都会被及时处理(处理时会删除该事件对应的node并free该event_info的heap内存)，但是如果在程序退出时，queue中存在
+  未处理的evnet，就会造成heap内存泄漏，因此提供event_destory函数，及时清理来不及处理的evnet_info所占用的内存
+6.event_init也给出了，但是目前想不到作用
+
+4. 代码使用
+
+1.main函数中分为两部分：被注释掉的部分是用来直接操作queue的，而未注释部分则是操作event的
+2.queue.h有内核list的全部实现
+3.queue.c中则是基于list的queue实现与基于queue的event-queue实现
+
+
