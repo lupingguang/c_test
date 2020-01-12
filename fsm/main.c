@@ -10,7 +10,7 @@ int main()
     printf("init fsm state %s\n", print_enum_name(fsm.curState));
     printf("-------------------------------------------\n");
     //小明的一天,周而复始的一天又一天，进行着相同的活动
-   // while (1)
+    while (1)
     {
 
         sleep(3);
