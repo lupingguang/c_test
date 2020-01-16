@@ -1,0 +1,9 @@
+how to debug with core file
+
+1. ulimit -c unlimited
+
+2. gdb test
+
+3. core-flie core
+
+4. bt  
