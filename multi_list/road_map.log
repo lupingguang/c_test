@@ -1,0 +1,117 @@
+list all path path_name: A0+KA1+KA2+A1, src: A0, dist: A1
+
+point KA1 is between path A0+KA1+KA2+A1
+
+point KA2 is between path A0+KA1+KA2+A1
+
+list all path path_name: A1+KA3+A2, src: A1, dist: A2
+
+point KA3 is between path A1+KA3+A2
+
+list all path path_name: A2+NULL+A3, src: A2, dist: A3
+
+list all path path_name: A2+NULL+B2, src: A2, dist: B2
+
+list all path path_name: B0+KB1+B1, src: B0, dist: B1
+
+point KB1 is between path B0+KB1+B1
+
+list all path path_name: B1+KB2+B2, src: B1, dist: B2
+
+point KB2 is between path B1+KB2+B2
+
+list all path path_name: B2+NULL+B3, src: B2, dist: B3
+
+list all path path_name: B1+NULL+C1, src: B1, dist: C1
+
+list all path path_name: B1+NULL+C3, src: B1, dist: C3
+
+list all path path_name: C0+NULL+C1, src: C0, dist: C1
+
+list all path path_name: C1+NULL+C2, src: C1, dist: C2
+
+list all path path_name: C2+KC1+C3, src: C2, dist: C3
+
+point KC1 is between path C2+KC1+C3
+
+list all path path_name: C3+KC2+C4, src: C3, dist: C4
+
+point KC2 is between path C3+KC2+C4
+
+list all station station_name: A0, addr:0x1547210
+
+path A0+KA1+KA2+A1 's src station is A0
+
+list all station station_name: A1, addr:0x1547250
+
+path A1+KA3+A2 's src station is A1
+
+path A0+KA1+KA2+A1 's dist station is A1
+
+list all station station_name: A2, addr:0x1547290
+
+path A2+NULL+A3 's src station is A2
+
+path A2+NULL+B2 's src station is A2
+
+path A1+KA3+A2 's dist station is A2
+
+list all station station_name: A3, addr:0x15472d0
+
+path A2+NULL+A3 's dist station is A3
+
+list all station station_name: B0, addr:0x1547310
+
+path B0+KB1+B1 's src station is B0
+
+list all station station_name: B1, addr:0x1547350
+
+path B1+KB2+B2 's src station is B1
+
+path B1+NULL+C1 's src station is B1
+
+path B1+NULL+C3 's src station is B1
+
+path B0+KB1+B1 's dist station is B1
+
+list all station station_name: B2, addr:0x1547390
+
+path B2+NULL+B3 's src station is B2
+
+path A2+NULL+B2 's dist station is B2
+
+path B1+KB2+B2 's dist station is B2
+
+list all station station_name: B3, addr:0x15473d0
+
+path B2+NULL+B3 's dist station is B3
+
+list all station station_name: C0, addr:0x1547410
+
+path C0+NULL+C1 's src station is C0
+
+list all station station_name: C1, addr:0x1547450
+
+path C1+NULL+C2 's src station is C1
+
+path B1+NULL+C1 's dist station is C1
+
+path C0+NULL+C1 's dist station is C1
+
+list all station station_name: C2, addr:0x1547490
+
+path C2+KC1+C3 's src station is C2
+
+path C1+NULL+C2 's dist station is C2
+
+list all station station_name: C3, addr:0x15474d0
+
+path C3+KC2+C4 's src station is C3
+
+path B1+NULL+C3 's dist station is C3
+
+path C2+KC1+C3 's dist station is C3
+
+list all station station_name: C4, addr:0x1547510
+
+path C3+KC2+C4 's dist station is C4

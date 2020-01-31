@@ -1,0 +1,92 @@
+内核链表的灵活之处在于能够在不同的结构体中随意插入链表节点，用以将某些元素放到不同的结构体中，达到互相包含的目的
+
+本例中定义了如下三种元素结构体以及一个入口结构体
+struct tiny_point
+{
+    unsigned char *point_name;
+    unsigned int status;   //表示维修点当前状态
+    struct list_head list; //用于将所有point串为链表
+    struct list_head list_for_path; //供path头节点将自己链入一个链表，该链表中所有元素均是该path中的point，对应pointof_path_head
+};
+
+//站点结构体
+//站点可能同时为多条path的起始站点或者目标站点，因此使用链表将所有关联path连起来
+struct tiny_station
+{
+    unsigned char *station_name;
+    struct list_head as_source_head;//用于将所有以该tiny_station作为起始站点的path串为链表
+    struct list_head as_dist_head;  //用于将所有以该tiny_station作为目标站点的path串为链表
+    struct list_head list;          //用于将所有tiny_station串为链表
+};
+
+//路径结构体
+//路径的起始站点与目标站点时确定的，因此仅使用指针指向即可
+struct tiny_path
+{
+   unsigned char *path_name;
+   struct tiny_station* src; //指向该path的起始站点
+   struct tiny_station* dist;//指向该path的目标站点
+   struct list_head pointof_path_head;//将该path中所有的break point 串为链表
+   struct list_head list; //用于将所有path串为链表
+   struct list_head list_for_src_station; // 供station的头节点将自己链入一个链表，该链表中所有元素均以该station为始发站点，对应as_source_head
+   struct list_head list_for_dist_station; // 供station的头节点将自己链入一个链表，该链表中所有元素均以该station为目标站点，对应as_dist_head
+
+};
+
+//三种链表：path、station、point的起点
+struct tiny_map
+{
+   unsigned char *map_name;
+   struct list_head path_list_head; //path链表的头节点
+   struct list_head station_list_head; //station链表的头节点
+   struct list_head point_list_head; //point链表的头节点
+   //struct list_head list; //用于将所有map串为链表，目前只测试一站图，因此去掉
+};
+
+
+一、设计出的存储结构如下：
+
+1. point 、station、path各自将同类型的所有元素串为三条链表，map中以head结尾的三个链表头节点分别指向这三条链表的首节点
+2. path结构体中的head结尾的链表头节点，指向位于该path路径中的point构成的链表的首节点，而对于path的src&dist station 各只有一个，因此无需链表，直接使用指针指向即可
+3. station结构体中，以head结尾的链表头节点，分别指向所有以该station作为src或者dist的path构成的两条链表的首节点
+4.三个结构体中名为list或者list_for打头的链表节点，是用来构成链表的。比如point中的list是为将自身串为链表，供map中的相应head指向，而list_for_path则为path中的相应head指向
+
+
+二、代码执行
+
+1.首先分别将point station path的各个元素挂到链表上（在堆上重新malloc各个元素），其中挂path元素时还要做其它两件事
+  1.1 path名称中包含该path的src&dist station 以及该path经过的point，因此需要首先查看涉及到的station与point的合理性(在上一步创建的列表中查看，保证均已注册过)
+  1.2 将path 中的两个指针struct tiny_station *src与tiny_station *dist直接指向对应的station结构体;将path经过的所有point再重新串为一个链表，并用自身的
+      pointof_path_head 链表头指向他
+      
+2.任意输入一个station，查看是否由完整的路径通过该station，所谓完整的路径可以这样理解：
+  path结构体仅代表两个station之间的一段路径，而从首发站到终点站可能需要经过多条path组成的路径，因此判断complete path工作分为如下几步：
+  2.1 向左检测，即检测给定站点与上一站的路径是否ok，ok的条件由两个：
+      2.1.1 若给定站点已经为起始站点，因为它前面没有path，自然也不会有point，肯定是ok的，判断是否为起始站点的方法是list_empty(&station->as_dist_head),
+            即判断有无路径把它作为目标站即可，没有的话，他自然时首发站
+      2.1.2 给定站点若未中间站，则需要依次判断以该station为目标站的上一段path经过的所有point的status是否都ok，如果有一个point fail，那么直接NG跳出point check loop
+      2.1.3 将以该station为目标站的所有path（可能有多条），都依次执行上述两步判断，若全部fail，则返回fail，向左检测失败，若发现任意一条path ok，则直接跳出path check loop
+            找到该station的上一个station（即 path->src->station_name）,递归调用执行步骤2.1,查找相邻的上一条path是否ok，如果上一条path check fail，则回到当前path ckeck loop
+            继续超找本层的其它path，直到遍历完一直fail 返回NG，或者找到其它ok的path，再次递归步骤2.1
+            
+            
+  2.2 向右检测，过程类似步骤2.1
+  
+  2.3 左右检测均成功，则认为该有一条complete path 经过给定的station
+      
+3. 所有的point 、station、path构成一张map，一幅预定义的map如下
+
+@A0@>>>>>>>|KA1|>>>>>>>|KA2|>>>>>>>A1>>>>>>>|KA3|>>>>>>>A2>>>>>>$A3$
+                                                       <<
+                                                     <<
+                                                   <<
+                                                 <<
+                                               <<
+@B0@>>>>>>>|KB1|>>>>>>>B1>>>>>>>|KB2|>>>>>>>>>B2>>>>>>>|KB3|>>>>>>$B3$
+                       <>
+                     <<  >>
+                   <<      >>
+                 <<          >>
+               <<              >>
+             <<                  >>
+@C0@>>>>>>>>C1>>>>C2>>>>|KC1|>>>>C3>>>>>>>|KC2|>>>>>>$C4$
