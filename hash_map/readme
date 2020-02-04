@@ -1,0 +1,41 @@
+内核中的hlist并没有实现hashmap全部功能，相当于一个半成品，可能是考虑灵活性吧，有如下几点需要用户完成
+1.自己选择哈希函数计算key(也就是数组下标)
+2.自己建立一定大小的hash桶(一般是个数组)
+3.自己自定义自定义结构体(里面放置hlist_node与vaule)
+
+hashmap三要素：bucket key-value func都是使用者自己设计，那内核的hlist干了什么？？？
+
+hlist目的是在出现key冲突时(将value使用哈希函数转换为key，多个vaule对应相同key)，如何组织所有的相同key的value
+1.bucket各个元素中存放的是一个hlist_head类型链表头(bucket多大，链表头就有几个)
+2.用户自定义结构体放一个hlist_node类型链表节点
+3.用户往桶中放value时，hlist_add_head(&user_struct[i].hash, &hlist_head[key]);实际上是把用户结构体中的hlist_node成员
+  串到某个链表头指向的链表中，当key不冲突时，链表只有一个元素;冲突时，链表中则存放所有相同key的用户结构体的hash成员
+
+
+例子中，再添加完数据后，遍历打印出了所有数据，如下：
+
+  1 found:index=6 key=0x01 array index=0, addr=0x601100
+  2 found:index=12 key=0x02 array index=1, addr=0x601118
+  3 found:index=2 key=0x04 array index=2, addr=0x601130
+  4 found:index=5 key=0x08 array index=3, addr=0x601148
+  5 found:index=10 key=0xce array index=12, addr=0x601220
+  6 found:index=10 key=0x10 array index=4, addr=0x601160
+  7 found:index=13 key=0x20 array index=5, addr=0x601178
+  8 found:index=4 key=0x40 array index=6, addr=0x601190
+  9 found:index=8 key=0x80 array index=7, addr=0x6011a8
+ 10 found:index=9 key=0x1d array index=8, addr=0x6011c0
+ 11 found:index=11 key=0x3a array index=9, addr=0x6011d8
+ 12 found:index=0 key=0x74 array index=10, addr=0x6011f0
+ 13 found:index=1 key=0xe8 array index=11, addr=0x601208
+ 14 found:index=10 key=0xce array index=12, addr=0x601220
+ 15 found:index=10 key=0x10 array index=4, addr=0x601160
+ 16 found:index=7 key=0x87 array index=13, addr=0x601238
+ 17 found:index=14 key=0x13 array index=14, addr=0x601250
+
+index:计算得到的key
+key：实际为value
+array index:各个value的实际顺序编号
+
+可以看到，只有第10个bucket位置存放了两个value(第6、7行与14、15行)，说明key =10是冲突的，其它key都是一个萝卜一个坑
+
+注：内核中的遍历宏使用了prefatch函数，不知道怎么去掉，所以遍历宏没有使用，而是自己的理解写了遍历过程，具体参注释
