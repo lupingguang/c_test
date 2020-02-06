@@ -1,0 +1,196 @@
+1. 使用makefile编译如下组织源文件的一个工程
+.
+├── Makefile.build
+├── Makefile
+├── include
+│?? ├── multiply.h
+│?? ├── add.h
+│?? └── sub.h
+├── add
+│?? ├── Makefile
+│?? ├── add1.c
+│?? └── add2.c
+├── multiply
+│?? ├── multiply.c
+│?? ├── Makefile
+│?? └── divide
+│??     ├── divide.c
+│??     ├── divide.h
+│??     └── Makefile
+├── sub
+│?? ├── Makefile
+│?? └── sub.c
+└── main.c
+
+其中 add sub multiply各自提供独立的接口，main.c中使用这些接口
+Makefile.build与Makefile为顶层编译，各个子模块的Makefile只负责提供需编译的中间件文件名称，所有的编译都不在子Makefile中进行
+
+2.编译过程
+
+2.1 Makefile
+    make后最先执行Makefile如下语句：
+	2.1.1
+        //-C表示，跳转到./目录，执行make，make的输入文件为TOPDIR目录的Makefile.build文件，此时跳转到2.1.1
+		make -C ./ -f $(TOPDIR)/Makefile.build
+	
+	2.1.2
+        //将built-in.o连接为最终可执行文件，完成编译	
+		$(CC) $(LDFLAGS) -o $(TARGET) built-in.o
+2.2 Makefile.build
+    2.1.1 
+	    Makefile.build执行时需要找到首目标，因此有下面的语句：
+	     PHONY := __build
+		 PHONY += $(subdir-y)
+		 .PHONY : $(PHONY)
+		 
+		很明显是把__build 与subdir-y两个目标用PHONY修饰，实现两者的无条件执行(不需要新旧等规则确认是否执行)，其中__build为首目标，看它先做了什么：
+		 __build:
+
+		obj-y :=
+		subdir-y :=
+		include Makefile
+		__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
+		subdir-y	+= $(__subdir-y)
+		subdir_objs := $(foreach f,$(subdir-y),$(f)/built-in.o)
+		cur_objs := $(filter-out %/, $(obj-y))
+		dep_files := $(foreach f,$(cur_objs),.$(f).d)
+		dep_files := $(wildcard $(dep_files))
+
+		ifneq ($(dep_files),)
+		  include $(dep_files)
+		endif
+		 
+		任何命令都没执行，而是使用函数获得了几个变量
+		
+	   包含进来Makefile 主要为了使用它里面定义的全局变量：TOPDIR AS LD CC等
+	   查找子目录与子目录需要编译的built-in.o文件：__subdir-y
+	   查找当前路径由obj-y指定的需要编译的.o文件：cur_objs
+ 	   找到cur_objs的依赖文件，这些依赖文件第一次编译才会生成，因此第一次编译时不使用依赖文件
+	
+	2.1.2 __build目标的编译过程
+	   
+        //__build依赖子目录的built-in.o与当前目录的built-in.o
+	    __build : $(subdir-y) built-in.o
+        
+		2.1.2.1
+		//首先进到子目录，继续使用Makefile.build 3.1.1的过程，直到找到最深目录
+		$(subdir-y):
+			make -C $@ -f $(TOPDIR)/Makefile.build
+		
+		2.1.2.2
+		//由上面的目标到这，首先编译所有的依赖，本例中是生成divide.o，同时生成依赖规则文件
+		%.o : %.c
+			$(CC) $(CFLAGS) -Wp,-MD,$(dep_file) -c -o $@ $<
+        
+		2.1.2.3
+		//由上面生成的依赖.o文件，打包生成最深目录的的built-in.o，此时为最深目录，因此subdir_objs不需编译
+		built-in.o : $(cur_objs) $(subdir_objs)
+			$(LD) -r -o $@ $^
+        
+		2.1.2.4
+		//一直递归执行2.1.2.1-2.1.2.3，遍历所有目录的各个目录（包括根目录），生成各个目录的.o与built-in.o，
+		//其中.o为中间文件，上层编译不会用到，仅使用built-in.o
+    	//回到2.1.2
+		
+		
+由编译过程可知：
+      1.顶层Makefile仅仅是定义一些全局变量，指明所有要编译的下一级目录，然后调用Makefile.build取完成各个目录源文件的编译(b不链接)
+        等各目录编译完成后，主Makefile做一次链接就行了；
+      2.Makefile.build需要完成众多任务，它需要编译各个目录源文件为.o文件，还要把某一级目录的所有.o打包为build-in.o
+	    最后各级目录的build-in.o整合为一个build-in.o文件，供主Makefile链接
+	  3.各个子目录的Makefile仅仅用obj-y = XXX来指明自己那些源文件需要被编译为.o即可，不存在任何实际编译工作
+	  4.这个内核写好的编译框架，可以用作应用程序使用，其中的obj-m已被去除，这不影响应用程序的编译。
+	  
+3.关键点说明：
+
+     3.1 = := += ?=区别
+	     =  为延迟生效的，也就是只有在使用这个变量时，才会真正赋值，例如Makefile.build中dep_file = .$@.d
+		    如果立即赋值，肯定是不行的，因为必须结合语境，.$@才有意义
+		 := 为立即生效，并且覆盖前面所有的赋值结果，例如Makefile.build中的：
+		    dep_files := $(foreach f,$(cur_objs),.$(f).d)
+		    dep_files := $(wildcard $(dep_files))
+			第一次赋值dep_file = .a.o.d  这与gcc生成的依赖规则文件名称一致
+			第二次赋值就变为 dep_file = ， 因为第一次运行时，没有生成依赖规则文件，所以匹配不到任何.a.o.d的文件，这样下面的判断不成立
+			就可避免在文件不存在时include文件导致的错误
+			ifneq ($(dep_files),)
+			  include $(dep_files)
+			endif
+			因此:=很霸气，立即生效且覆盖之前的值
+		+= ?= 类似于 = ，不过一个是追加，一个空则赋值，但都是延时生效
+		
+     3.2  一个目标引发的命令何时结束？
+	      一条目标的命令集会一直往下检索，直到遇到非命令相关的部分（例如其他目标，变量定义等）
+	      3.2.1 空行、ifeq、define、ifndef等并不作为命令集的结束
+          3.2.2 新的目标或者定义变量会识别为命令集的结束
+		  
+     3.3 依赖规则文件的生成
+         依赖规则文件是指gcc自带的  $(CC) $(CFLAGS) -Wp,-MD,$(dep_file) -c -o $@ $<    -MD,$(dep_file) 会根据源文件名称自动推倒他的依赖：
+		 看一下，sub.o的依赖文件：
+		 sub.o:   sub.c 
+				 /home/lupingguang/lpg/makefile_demo/include/sub.h \
+				 /usr/include/features.h /usr/include/x86_64-linux-gnu/sys/cdefs.h \
+				 /usr/include/x86_64-linux-gnu/bits/wordsize.h \
+				 /usr/include/x86_64-linux-gnu/gnu/stubs.h \
+				 /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
+				 /usr/lib/gcc/x86_64-linux-gnu/5/include/stddef.h \
+				 /usr/include/x86_64-linux-gnu/bits/types.h \
+				 /usr/include/x86_64-linux-gnu/bits/typesizes.h /usr/include/libio.h \
+				 /usr/include/_G_config.h /usr/include/wchar.h \
+				 /usr/lib/gcc/x86_64-linux-gnu/5/include/stdarg.h \
+				 /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
+				 /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
+				 /usr/include/x86_64-linux-gnu/bits/stdio.h \
+				 /usr/include/x86_64-linux-gnu/bits/stdio2.h
+         除了必须的头文件，源文件sub.c与sub.h也都找到了，既然这么强大，那就利用这个文件，不要自己写依赖了，Makefile.build就是这么做的：
+		 3.3.1 第一次编译时，$(CC) $(CFLAGS) -Wp,-MD,$(dep_file) -c -o $@ $< 生成各个.o的依赖规则文件
+		 3.3.2 第二次编译：
+				dep_files := $(wildcard $(dep_files))			
+				ifneq ($(dep_files),)
+				  include $(dep_files)
+				endif
+			   直接导入这个文件
+			   再结合静态模式匹配  %.o : %.c(其实依赖规则文件中的sub.c可以去掉只保留.h文件的关联信息就行，因为静态模式匹配会自动找到.c的)
+			   
+		 
+		 
+4.框架使用步骤	  
+                                                                        
+	本程序的Makefile分为3类:                                                
+	1. 顶层目录的Makefile                                                   
+	2. 顶层目录的Makefile.build
+	3. 各级子目录的Makefile
+
+	一、各级子目录的Makefile：
+	   它最简单，形式如下：
+	obj-y += file.o
+	obj-y += subdir/
+	   
+	   "obj-y += file.o"表示把当前目录下的file.c编进程序里，
+	   "obj-y += subdir/"表示要进入subdir这个子目录下去寻找文件来编进程序里，是哪些文件由subdir目录下的Makefile决定。
+
+	注意: "subdir/"中的斜杠"/"不可省略
+
+	二、顶层目录的Makefile：
+	   它除了定义obj-y来指定根目录下要编进程序去的文件、子目录外，主要是定义工具链、编译参数、链接参数──就是文件中用export导出的各变量。
+
+	三、顶层目录的Makefile.build：
+	   这是最复杂的部分，它的功能就是把某个目录及它的所有子目录中、需要编进程序去的文件都编译出来，打包为built-in.o
+	   详细的讲解请看视频。
+
+	四、怎么使用这套Makefile：
+	1．把顶层Makefile, Makefile.build放入程序的顶层目录
+	2．修改顶层Makefile
+	2.1 修改工具链
+	2.2 修改编译选项、链接选项
+	2.3 修改obj-y决定顶层目录下哪些文件、哪些子目录被编进程序
+	2.4 修改TARGET，这是用来指定编译出来的程序的名字
+
+	3. 在各一个子目录下都建一个Makefile，形式为：
+	obj-y += file1.o
+	obj-y += file2.o
+	obj-y += subdir1/
+	obj-y += subdir2/
+
+	4. 执行"make"来编译，执行"make clean"来清除，执行"make distclean"来彻底清除
+   
+   
