@@ -18,7 +18,7 @@ export STRIP OBJCOPY OBJDUMP
 CFLAGS := -Wall -O2 -g
 CFLAGS += -I $(shell pwd)/include
 
-LDFLAGS :=  
+LDFLAGS := -L $(shell pwd)/lib -liniparser 
 
 export CFLAGS LDFLAGS
 
@@ -36,7 +36,8 @@ obj-y += sub/
 
 all : 
 	make -C ./ -f $(TOPDIR)/Makefile.build
-	$(CC) $(LDFLAGS) -o $(TARGET) built-in.o
+	#链接库时，需要把库放到最后面
+	$(CC)  -o $(TARGET) built-in.o  $(LDFLAGS)
 
 
 clean:
