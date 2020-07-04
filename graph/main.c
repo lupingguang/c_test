@@ -74,7 +74,7 @@ static void link_last(ENode *list, ENode *node)
     p->next_edge = node;
 }
 
-int visited[100];
+int visited[1];
 //对图g中第i个顶点，递归完成深度优先遍历
 void DFS(LGraph g, int i)
 {
@@ -135,7 +135,8 @@ void Path_DFS(LGraph G, int i, int j)
 		            printf("%d(%c)",get_position(G, vertex[m]), vertex[m]); 
 		printf("\n");
 	}
-        
+
+
         //无论这次递归是否到达终止顶点，都回退当前遍历过得顶点，一步步回到分叉顶点，再次遍历另一个分支
         //清标记，证明对于某个顶点的访问已结束，现在回退为未访问状态
         visited[i] = 0;
@@ -227,7 +228,8 @@ LGraph* create_example_lgraph()
         {'D', 'C'}, 
         {'E', 'B'}, 
         {'E', 'D'}, 
-        {'F', 'G'}}; 
+        {'F', 'G'},
+        {'G', 'E'}}; 
     int vlen = LENGTH(vexs);
     int elen = LENGTH(edges);
     int i, p1, p2;
@@ -304,17 +306,19 @@ void main()
 
     // 打印图的邻居表
     print_lgraph(*pG);
-
     //深度优先遍历找出所有顶点
     //DFStraverse(*pG);
 
     int start, end;
-    
+    char s ,e;
     printf("input vertex start:\n");
-    scanf("%d", &start);
+    scanf("%s", &s);
+    start = get_position(*pG, s);
     printf("input vertex end:\n");
-    scanf("%d", &end);
-    printf("the path form %d to %d:\n", start, end);
+    scanf("%s", &e);
+    end = get_position(*pG, e);
+
+    printf("the path from %c to %c:\n", s, e);
     //深度优先找出某两个顶点之间的所有路径
     SimplePath(*pG, start, end);
 }
