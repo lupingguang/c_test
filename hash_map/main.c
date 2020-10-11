@@ -27,6 +27,71 @@ static inline int hash_func(unsigned char k)
     return ((a * k + b) % p) % m;
 }
 
+static struct q_coef* hash_query(unsigned char ckey)
+{
+        struct q_coef *q;
+        struct hlist_node *hn;
+	struct hlist_node *temp_hn = NULL;
+        struct q_coef *hash_node = NULL;
+	int j = hash_func(ckey);
+        hn = hashtbl[j].first;
+        
+        do
+        {
+               q = container_of(hn, struct q_coef, hash);
+               if(q->coef == ckey)
+               {
+			//printf("find ckey =%d, in bucket index %d\n", ckey, j);
+                        hash_node = q;
+			break;
+	       }
+               temp_hn = hn;
+               hn = hn->next;
+        }
+        while(temp_hn->next != NULL);
+        return hash_node;
+}
+
+int hash_delete(unsigned char key)
+{
+	struct q_coef* hash_node = hash_query(key);
+	if(hash_node != NULL)
+	{
+        	printf("delete key =0x%02x, in bucket\n", hash_node->coef);
+		hlist_del_init(&(hash_node->hash));
+		return 1;
+	}
+	else
+	{
+     		printf("cant find key in bucket\n");
+		return -1;
+	}
+}
+
+int hash_add(unsigned char key, unsigned char index)
+{
+	int j = hash_func(key);
+        if(q_coef_list[j].coef == 0xff)
+        {
+                q_coef_list[j].coef = key;
+                q_coef_list[j].index = index;
+                hlist_add_head(&q_coef_list[j].hash, &hashtbl[j]);
+                printf("add key to bucket %d,addr:%p\n",j, &q_coef_list[j]);
+        }
+        else
+        {
+                struct q_coef * dy_q_coef = (struct q_coef *)malloc(sizeof(struct q_coef));
+                dy_q_coef->coef = key;
+                dy_q_coef->index = index;
+                INIT_HLIST_NODE(&(dy_q_coef->hash));
+                printf("add key to bucket %d list, key=0x%02x, index=%d,addr:%p\n",j, key, index, (dy_q_coef));
+                hlist_add_head(&(dy_q_coef->hash), &hashtbl[j]);
+
+        }
+	return 1;
+
+}
+
 static void hash_init(void)
 {
     int i, j;
@@ -44,7 +109,7 @@ static void hash_init(void)
 	        q_coef_list[j].coef = coef[i];
 	        q_coef_list[j].index = i;
                 hlist_add_head(&q_coef_list[j].hash, &hashtbl[j]);
-		printf("j1= %d, i =%d addr:%p\n",j,i, &q_coef_list[j]);
+		//printf("j1= %d, i =%d addr:%p\n",j,i, &q_coef_list[j]);
 	}
         else
 	{
@@ -52,7 +117,7 @@ static void hash_init(void)
                 dy_q_coef->coef = coef[i];
                 dy_q_coef->index = i;
                 INIT_HLIST_NODE(&(dy_q_coef->hash));
-	 	printf("j2= %d, i =%d add:%p\n",j,i,(dy_q_coef));
+	 	//printf("j2= %d, i =%d add:%p\n",j,i,(dy_q_coef));
 		hlist_add_head(&(dy_q_coef->hash), &hashtbl[j]);
 
 	}
@@ -99,6 +164,18 @@ static void hash_test(void)
 
 int main(void)
 {
-   hash_init();
-   hash_test();
+   	hash_init();
+   	hash_test();
+   	struct q_coef * hash_node = hash_query(0x3a);
+   	if(hash_node != NULL)
+   	{
+		printf("query ckey =0x%02x, in bucket\n", hash_node->coef);
+   	}
+   	hash_delete(0x3a);
+	printf("after delete key: 0x3a,show data\n");
+   	hash_test();
+	hash_add(0x3a, 100);
+   	printf("after add key: 0x3a,show data\n");
+   	hash_test();
+
 }
